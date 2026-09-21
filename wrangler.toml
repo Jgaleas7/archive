@@ -6,3 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "archive-db"
 database_id = "7bfdb814-51af-4626-948e-e8860d336eb7"
+
+main = ".open-next/worker.js"
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
