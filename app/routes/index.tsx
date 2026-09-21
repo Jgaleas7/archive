@@ -1,76 +1,129 @@
-'use client';
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/start'
+import { getEvent } from 'vinxi/http'
+import { useState, useEffect, useCallback } from 'react'
+import { authClient } from '@/lib/auth-client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { authClient } from '@/lib/auth-client';
-import { useRouter } from 'next/navigation';
+export const Route = createFileRoute('/')({
+  component: Home,
+})
 
-export default function Home() {
-  const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
+const searchArchiveFn = createServerFn({ method: 'GET' })
+  .validator((d: { q: string; page: number; hasTape?: boolean; year?: string }) => d)
+  .handler(async ({ data }) => {
+    const event = getEvent()
+    const db = event?.context?.cloudflare?.env?.DB || process.env.DB
+    
+    // Auth check
+    const { getAuth } = await import('@/lib/auth')
+    const auth = getAuth(db)
+    
+    // Convert Headers to standard Request headers
+    const reqHeaders = new Headers()
+    const rawHeaders = event.node.req.headers
+    for (const [key, value] of Object.entries(rawHeaders)) {
+      if (Array.isArray(value)) {
+        value.forEach(v => reqHeaders.append(key, v))
+      } else if (value) {
+        reqHeaders.append(key, value)
+      }
+    }
+    
+    const session = await auth.api.getSession({ headers: reqHeaders })
+    if (!session) {
+      throw new Error("Unauthorized")
+    }
 
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [hasTape, setHasTape] = useState(false);
-  const [year, setYear] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [selectedRecord, setSelectedRecord] = useState(null);
+    const { q, page, hasTape, year } = data
+    const limit = 20
+    const offset = (page - 1) * limit
+
+    const sanitizedQuery = q.replace(/["*()]/g, ' ').trim()
+    if (!sanitizedQuery) {
+      return { results: [], total: 0, page, totalPages: 0 }
+    }
+
+    let ftsQuery = `"${sanitizedQuery}"*`
+    if (year) ftsQuery += ` AND date_aired:${year}*`
+
+    let whereClause = `archive MATCH ?`
+    if (hasTape) whereClause += ` AND tape_time_code != '' AND tape_time_code != '/'`
+
+    const countResult = await db.prepare(`SELECT count(*) as count FROM archive WHERE ${whereClause}`).bind(ftsQuery).first()
+    const count = countResult?.count || 0
+
+    const { results } = await db.prepare(`
+      SELECT *, snippet(archive, -1, '<b>', '</b>', '...', 64) as snippet
+      FROM archive WHERE ${whereClause} ORDER BY rank LIMIT ? OFFSET ?
+    `).bind(ftsQuery, limit, offset).all()
+
+    return { results, total: count, page, totalPages: Math.ceil((count as number) / limit) }
+  })
+
+function Home() {
+  const navigate = useNavigate()
+  const { data: session, isPending } = authClient.useSession()
+
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [hasTape, setHasTape] = useState(false)
+  const [year, setYear] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [selectedRecord, setSelectedRecord] = useState<any>(null)
 
   useEffect(() => {
     if (!isPending && !session) {
-      router.push('/login');
+      navigate({ to: '/login' })
     }
-  }, [session, isPending, router]);
+  }, [session, isPending, navigate])
 
-  // Debounce the search input
   useEffect(() => {
     const handler = setTimeout(() => {
-      setDebouncedQuery(query);
-      setPage(1); // Reset to first page on new search
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [query]);
+      setDebouncedQuery(query)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(handler)
+  }, [query])
 
-  // Reset page when filters change
   useEffect(() => {
-    setPage(1);
-  }, [hasTape, year]);
+    setPage(1)
+  }, [hasTape, year])
 
   const fetchResults = useCallback(async () => {
     if (!debouncedQuery) {
-      setResults([]);
-      setTotal(0);
-      setTotalPages(0);
-      return;
+      setResults([])
+      setTotal(0)
+      setTotalPages(0)
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      const params = new URLSearchParams({
-        q: debouncedQuery,
-        page: page.toString(),
-      });
-      if (hasTape) params.set('hasTape', 'true');
-      if (year) params.set('year', year);
-
-      const res = await fetch(`/api/search?${params.toString()}`);
-      const data = await res.json();
-      setResults(data.results || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 0);
+      const data = await searchArchiveFn({
+        data: {
+          q: debouncedQuery,
+          page,
+          hasTape,
+          year,
+        }
+      })
+      setResults(data.results || [])
+      setTotal(data.total || 0)
+      setTotalPages(data.totalPages || 0)
     } catch (err) {
-      console.error('Error fetching search results:', err);
+      console.error('Error fetching search results:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [debouncedQuery, page, hasTape, year]);
+  }, [debouncedQuery, page, hasTape, year])
 
   useEffect(() => {
-    fetchResults();
-  }, [fetchResults]);
+    fetchResults()
+  }, [fetchResults])
 
   if (selectedRecord) {
     return (
@@ -120,7 +173,7 @@ export default function Home() {
           )}
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -132,7 +185,7 @@ export default function Home() {
         </div>
         <button 
           className="vbg-button" 
-          onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => router.push('/login') } })}
+          onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => navigate({ to: '/login' }) } })}
         >
           Sign Out
         </button>
@@ -250,5 +303,5 @@ export default function Home() {
         )}
       </div>
     </div>
-  );
+  )
 }
