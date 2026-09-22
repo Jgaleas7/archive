@@ -29,6 +29,8 @@
     "@tanstack/router-plugin": "~1.120.0",
     "@tanstack/react-start-plugin": "~1.120.0",
     "@tanstack/server-functions-plugin": "~1.120.0",
+    "@tanstack/react-start-server": "~1.120.0",
+    "@tanstack/start-server-core": "~1.120.0",
     "vinxi": "0.5.3"
   },
   "devDependencies": {
