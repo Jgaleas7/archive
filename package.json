@@ -9,9 +9,11 @@
     "cloudflare-deploy": "vinxi build && npx wrangler deploy"
   },
   "dependencies": {
-    "@tanstack/react-router": "^1.170.38",
-    "@tanstack/react-start": "^1.168.57",
-    "@tanstack/start": "^1.120.20",
+    "@tanstack/react-router": "~1.120.0",
+    "@tanstack/react-start": "~1.120.0",
+    "@tanstack/router-generator": "~1.120.0",
+    "@tanstack/router-plugin": "~1.120.0",
+    "@tanstack/start": "~1.120.0",
     "better-auth": "^1.7.5",
     "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",
@@ -20,6 +22,13 @@
     "vinxi": "^0.5.11",
     "vite": "^8.3.0",
     "zod": "^4.6.5"
+  },
+  "overrides": {
+    "@tanstack/react-router": "~1.120.0",
+    "@tanstack/router-generator": "~1.120.0",
+    "@tanstack/router-plugin": "~1.120.0",
+    "@tanstack/react-start-plugin": "~1.120.0",
+    "@tanstack/server-functions-plugin": "~1.120.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260921.1",
