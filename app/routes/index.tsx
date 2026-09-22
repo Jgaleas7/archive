@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/start'
+import { createServerFn } from '@tanstack/react-start'
 import { getEvent } from 'vinxi/http'
 import { useState, useEffect, useCallback } from 'react'
 import { authClient } from '@/lib/auth-client'
